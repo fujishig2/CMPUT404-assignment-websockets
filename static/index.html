@@ -40,21 +40,36 @@ function debug(str) {
     var debugDiv = document.getElementById('debug');
     debugDiv.innerHTML = "" + str;
 }
-debug("Test");
+// debug("Test");
 
 world = {};
 
-//XXX: TODO Make this prettier!
+// Draw circle function
 function drawCircle(context,entity) {
     with(context) {
-        beginPath();                
+        beginPath();              
         lineWidth = 3;
         var x = entity["x"];
         var y = entity["y"];
-        //moveTo(x,y);
         fillStyle = entity["colour"];
         strokeStyle = fillStyle;
-        arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
+        arc(x, y, (entity["radius"])?entity["radius"]:25, 0, 2.0 * Math.PI, false);  
+        fill();
+        stroke();                                
+    }
+}
+
+// Draw rectangle function
+function drawRectangle(context,entity) {
+    with(context) {
+        beginPath();              
+        lineWidth = 3;
+        var x = entity["x"];
+        var y = entity["y"];
+        fillStyle = entity["colour"];
+        strokeStyle = fillStyle;
+        rect(x-15, y-15, 30, 30);  
+        fill();
         stroke();                                
     }
 }
@@ -62,9 +77,6 @@ function drawCircle(context,entity) {
 function prepEntity(entity) {
     if (!entity["colour"]) {
         entity["colour"] = "#FF0000";
-    }
-    if (!entity["radius"]) {
-        entity["radius"] = 50;
     }
     return entity;
 }
@@ -78,12 +90,16 @@ function clearFrame() {
 
 }
 
-// This actually draws the frame
+// This actually draws the frame. Draws a rectangle if no radius is provided
 function renderFrame() {
     clearFrame();
     for (var key in world) {
         var entity = world[key];
-        drawCircle(context,prepEntity(entity));
+        if (!entity["radius"]) {
+            drawRectangle(context, prepEntity(entity))
+        } else {
+            drawCircle(context,prepEntity(entity));
+        }
     }
 }
 
@@ -128,7 +144,7 @@ function addEntity(entity, data) {
 }
 var counter = 0;
 function addEntityWithoutName(data) {
-    var name = "X"+(counter++)%100;
+    var name = "X"+(counter++)%100000;
     addEntity(name,data);
 }
 
@@ -228,19 +244,33 @@ mouse = (function() {
     return self;
 })();
 
+// List of colours which will be called at random
+const colours = ['#347067', '#799662', '#7a5c74', '#fc7544', '#fcff61', '#a8ffec', '#ff007b', '#ffa408', '#94ff08', 
+                    '#0000ff', '#ff0000', '#00ff00', '#4a1da2', '#7ad857', '#bd48e3', '#8aa557', '#fbc760', '#5deee1', 
+                    '#b21298', '#6f2033', '#2d3421', '#ffffff', '#ad3e36'];
+
 // Add the application specific mouse listeners!
-//XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
+    addEntityWithoutName({'x':x+25,'y':y+25,'colour':colours[Math.floor(Math.random()*colours.length)]});
+    addEntityWithoutName({'x':x+25,'y':y-25,'colour':colours[Math.floor(Math.random()*colours.length)]});
+    addEntityWithoutName({'x':x-25,'y':y+25,'colour':colours[Math.floor(Math.random()*colours.length)]});
+    addEntityWithoutName({'x':x-25,'y':y-25,'colour':colours[Math.floor(Math.random()*colours.length)]});
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    addEntityWithoutName({'x':x+25,'y':y+25,'colour':colours[Math.floor(Math.random()*colours.length)], 
+                          'radius': 15});
+    addEntityWithoutName({'x':x+25,'y':y-25,'colour':colours[Math.floor(Math.random()*colours.length)], 
+                          'radius': 15});
+    addEntityWithoutName({'x':x-25,'y':y+25,'colour':colours[Math.floor(Math.random()*colours.length)], 
+                          'radius': 15});
+    addEntityWithoutName({'x':x-25,'y':y-25,'colour':colours[Math.floor(Math.random()*colours.length)], 
+                          'radius': 15});
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    addEntityWithoutName({'x':x,'y':y,'colour':colours[Math.floor(Math.random()*colours.length)],
+                          'radius':7});
 });
 
 
@@ -268,7 +298,7 @@ function wsSetup() {
     }; 
 }
 
-wsSetup();
+// wsSetup();
 
 
 

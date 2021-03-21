@@ -66,10 +66,10 @@ def set_listener( entity, data ):
 
 myWorld.add_set_listener( set_listener )
         
-@app.route('/')
-def hello():
-    '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+# Home page. This is the usable draw board
+@app.route("/")
+def index():
+    return flask.send_from_directory('static','index.html')
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
@@ -96,26 +96,84 @@ def flask_post_json():
     else:
         return json.loads(request.form.keys()[0])
 
+# Entity API (Post/Put only). This is the API which handles entity calls.
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
-    '''update the entities via this interface'''
+    try:
+        # Post handler. Create a new entity
+        if request.method == "POST":
+            req_json = flask_post_json()
+            # Check to see if the entity already exists. If it does exist, 
+            # create a new entity with name X(length).
+            if myWorld.get(entity) != {}:
+                entity = "X" + str(len(myWorld.world()))
+            myWorld.set(entity, req_json)
+            # Return the entity using a direct call to the world to ensure that we are sending
+            # the worlds data.
+            return app.response_class(response=json.dumps(myWorld.get(entity)), mimetype='application/json')
+
+        # Put handler. Update an existing entity
+        elif request.method == "PUT":
+            req_json = flask_post_json()
+            # Update the entitys attributes given in the update request
+            for key in req_json:
+                myWorld.update(entity, key, req_json[key])
+            # Return the entity using a direct call to the world to ensure that we are sending
+            # the worlds data.
+            return app.response_class(response=json.dumps(myWorld.get(entity)), mimetype='application/json')
+        else:
+            return "Method not handled.", 405
+
+    # Error handler
+    except:
+        return "Cannot update entity.", 400
     return None
 
+# World API (Post/Get only). This API handles all calls to the world.
 @app.route("/world", methods=['POST','GET'])    
 def world():
-    '''you should probably return the world here'''
-    return None
+    # Get handler. Returns the current world
+    if request.method == 'GET':
+        return app.response_class(response=json.dumps(myWorld.world()), mimetype='application/json')
 
+    # Post handler. Sets the world to be the world given in the post body
+    elif request.method == 'POST':
+        try:
+            req_json = flask_post_json()
+            # Clear the world
+            world.clear()
+            # Set the world to be the world found in the post request
+            for key in req_json:
+                world.set(key, req_json[key])
+            # Return the new world
+            return app.response_class(response=json.dumps(myWorld.world()), mimetype='application/json')
+        # Error handler
+        except:
+            return "Cannot update world.", 400
+        
+    else:
+        return "Method not handled.", 405
+
+# Entity Get handler. Gets a given entity's information
 @app.route("/entity/<entity>")    
 def get_entity(entity):
-    '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    if request.method == 'GET':
+        return app.response_class(response=json.dumps(myWorld.get(entity)), mimetype='application/json')
+    return "Method not handled.", 405
 
-
+# Clear Post/Get API. Clears the world of all its contents.
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     '''Clear the world out!'''
-    return None
+    if request.method == 'GET' or request.method == 'POST':
+        try:
+            # Clear the world
+            myWorld.clear()
+            # Return the cleared world
+            return app.response_class(response=json.dumps(myWorld.world()), mimetype='application/json')
+        except:
+            return "Cannot clear world.", 400
+    return "Method not handled.", 405
 
 
 
