@@ -35,6 +35,7 @@ var W = canvas.width  = window.innerWidth-6;
 var H = canvas.height = window.innerHeight-50;
 var wscounter = 0;
 var socket;
+var counter = 0;
 
 function debug(str) {
     var debugDiv = document.getElementById('debug');
@@ -138,11 +139,9 @@ function getPosition(e) {
 }
 
 function addEntity(entity, data) {
-    world[entity] = data;
-    drawNextFrame(); // (but should we?)
-    //XXX: Send a XHTML Request that updates the entity you just modified!
+    socket.send(JSON.stringify({[entity]:data}));
 }
-var counter = 0;
+
 function addEntityWithoutName(data) {
     var name = "X"+(counter++)%100000;
     addEntity(name,data);
@@ -283,24 +282,32 @@ function wsSetup() {
     var url = "ws://"+host+"/subscribe";   
     socket = new WebSocket(url);
     socket.onopen = function() {
-        //XXX: TODO What are you going to do here?
+        socket.send("get world");
     };
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
     };
     socket.onmessage = function(msg) {  
         try {
-            debug("WebSocket Recv:" + msg.data);
-            //XXX: TODO What are you going to do here?            
+            // debug("WebSocket Recv:" + msg.data);
+            //XXX: TODO What are you going to do here? 
+            if (msg.data != "clear world") {
+                let parse = JSON.parse(msg.data);
+                for(entity in parse) {
+                    world[entity] = parse[entity];
+                }
+            } else {
+                world = {}
+            }
+            counter = Object.keys(world).length;
+            drawNextFrame();      
         } catch (e) {
             alert("socket on message: " + e);
         }
     }; 
 }
 
-// wsSetup();
-
-
+wsSetup();
 
 
 // 30 frames per second

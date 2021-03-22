@@ -26,6 +26,18 @@ app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
 
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def put(self, v):
+        self.queue.put_nowait(v)
+
+    def get(self):
+        return self.queue.get()
+
+clients = list()
+
 class World:
     def __init__(self):
         self.clear()
@@ -51,6 +63,8 @@ class World:
             listener(entity, self.get(entity))
 
     def clear(self):
+        for client in clients:
+            client.put("clear world")
         self.space = dict()
 
     def get(self, entity):
@@ -63,9 +77,11 @@ myWorld = World()
 
 def set_listener( entity, data ):
     ''' do something with the update ! '''
+    for client in clients:
+        client.put(json.dumps({entity: data}))
 
 myWorld.add_set_listener( set_listener )
-        
+     
 # Home page. This is the usable draw board
 @app.route("/")
 def index():
@@ -73,14 +89,46 @@ def index():
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
-    # XXX: TODO IMPLEMENT ME
-    return None
+    try:
+        while True:
+            msg = ws.receive()
+            # print("WS RECV: %s" % msg)
+            if (msg is not None):
+                if msg != "get world":
+                    parsed = json.loads(msg)
+                    for key in parsed:
+                        if myWorld.get(key):
+                            # for key in parsed[key]:
+                            #     myWorld.update(parsed["entity"], key, parsed["data"][key])
+                            myWorld.set("X" + str(len(myWorld.world())), parsed[key])
+                        else:
+                            myWorld.set(key, parsed[key])
+                    # myWorld.set(parsed["entity"], parsed["data"])
+                else:
+                    client.put(json.dumps(myWorld.world()))
+            else:
+                break
+    except:
+        '''Done'''
 
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
-    # XXX: TODO IMPLEMENT ME
+    client = Client()
+    clients.append(client)
+    # client.put(json.dumps(myWorld.world()))
+    g = gevent.spawn( read_ws, ws, client )    
+    try:
+        while True:
+            # block here
+            msg = client.get()
+            ws.send(msg)
+    except Exception as e:# WebSocketError as e:
+        print("WS Error %s" % e)
+    finally:
+        clients.remove(client)
+        gevent.kill(g)
     return None
 
 
