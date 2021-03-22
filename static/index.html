@@ -33,7 +33,6 @@ var host = window.location.host;
 var context = canvas.getContext("2d");
 var W = canvas.width  = window.innerWidth-6;
 var H = canvas.height = window.innerHeight-50;
-var wscounter = 0;
 var socket;
 var counter = 0;
 
@@ -75,6 +74,8 @@ function drawRectangle(context,entity) {
     }
 }
 
+// prepEntity just makes sure there is a colour present. We don't need to check
+// for radius because a lack of radius indicates the entity will be a rectangle.
 function prepEntity(entity) {
     if (!entity["colour"]) {
         entity["colour"] = "#FF0000";
@@ -138,10 +139,14 @@ function getPosition(e) {
 	}
 }
 
+// Adding an entity will send the entity being added to the server
+// through the socket connection. No need to worry about rendering it
+// until we get a response back from the server that it's been added.
 function addEntity(entity, data) {
     socket.send(JSON.stringify({[entity]:data}));
 }
 
+//Adding an entity which is given an auto-generated name
 function addEntityWithoutName(data) {
     var name = "X"+(counter++)%100000;
     addEntity(name,data);
@@ -277,28 +282,37 @@ function update() {
     drawFrame();
 }
 
-
+// Websocket setup and response handler
 function wsSetup() {
+    // Setup the websocket
     var url = "ws://"+host+"/subscribe";   
     socket = new WebSocket(url);
+    // On the initial connection, we get the current world
+    // from the server by sending the message get world.
     socket.onopen = function() {
         socket.send("get world");
     };
+    // Error handler regarding any connection issues.
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
     };
+    // Websocket response handler
     socket.onmessage = function(msg) {  
         try {
-            // debug("WebSocket Recv:" + msg.data);
-            //XXX: TODO What are you going to do here? 
+            // Check to see if the response is a clear world command
             if (msg.data != "clear world") {
+                // Parse the response and add the entities given.
                 let parse = JSON.parse(msg.data);
                 for(entity in parse) {
                     world[entity] = parse[entity];
                 }
+            // If this is a clear world message, clear the world.
             } else {
                 world = {}
             }
+            // Set the counter and draw the next frame. DrawNextFrame
+            // is only ever called here. Thus, the world is only being
+            // drawn when there's a response from the server.
             counter = Object.keys(world).length;
             drawNextFrame();      
         } catch (e) {

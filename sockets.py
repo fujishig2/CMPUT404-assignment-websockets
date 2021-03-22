@@ -26,6 +26,8 @@ app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
 
+# Setup a client class with a queue. If the queue has any data put into it, it will be sent to
+# the client.
 class Client:
     def __init__(self):
         self.queue = queue.Queue()
@@ -36,6 +38,7 @@ class Client:
     def get(self):
         return self.queue.get()
 
+# Setup a global list of clients
 clients = list()
 
 class World:
@@ -75,11 +78,13 @@ class World:
 
 myWorld = World()        
 
+# Put the entity being listened to into the client queue
 def set_listener( entity, data ):
-    ''' do something with the update ! '''
     for client in clients:
         client.put(json.dumps({entity: data}))
 
+# Initialize the add_set_listener to be a function called
+# whenever a listener is being updated.
 myWorld.add_set_listener( set_listener )
      
 # Home page. This is the usable draw board
@@ -87,23 +92,26 @@ myWorld.add_set_listener( set_listener )
 def index():
     return flask.send_from_directory('static','index.html')
 
+# Websocket client message handler.
 def read_ws(ws,client):
-    '''A greenlet function that reads from the websocket and updates the world'''
     try:
         while True:
+            # Receive the message from the client
             msg = ws.receive()
-            # print("WS RECV: %s" % msg)
             if (msg is not None):
+                # Check to see if the message is a get world command
                 if msg != "get world":
+                    # Parse the message and add it to the world.
                     parsed = json.loads(msg)
                     for key in parsed:
+                        # Make sure we aren't adding any duplicates. It could potentially happen
+                        # if many different clients are making requests at the exact same time.
                         if myWorld.get(key):
-                            # for key in parsed[key]:
-                            #     myWorld.update(parsed["entity"], key, parsed["data"][key])
                             myWorld.set("X" + str(len(myWorld.world())), parsed[key])
                         else:
                             myWorld.set(key, parsed[key])
-                    # myWorld.set(parsed["entity"], parsed["data"])
+                # If this is a get world command, simply return the world to the
+                # client which sent the request in.
                 else:
                     client.put(json.dumps(myWorld.world()))
             else:
@@ -111,15 +119,16 @@ def read_ws(ws,client):
     except:
         '''Done'''
 
+# Websocket subscribe handler. Also the server to client message handler.
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
-    '''Fufill the websocket URL of /subscribe, every update notify the
-       websocket and read updates from the websocket '''
+    # Create new client and add it to the greenlet
     client = Client()
     clients.append(client)
-    # client.put(json.dumps(myWorld.world()))
     g = gevent.spawn( read_ws, ws, client )    
     try:
+        # Send messages to the client by popping from the queue of
+        # entities and sending those entities to the client.
         while True:
             # block here
             msg = client.get()
